@@ -1,35 +1,26 @@
-'use client'
+"use client"
 
 import React, { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Filter, Settings2, RotateCcw } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/hooks'
-import TokenCard from './TokenCard'
-import { TokenStatus, updatePrices } from '@/lib/features/market/marketSlice'
+import { Settings2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FilterModal } from './FilterModal'
+import { cn } from '@/lib/utils'
+import TokenCard from './TokenCard'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks'
+import { TokenData, TokenStatus, updatePrices } from '@/lib/features/market/marketSlice'
 
-// Column Component
 interface PulseColumnProps {
-    /** Title of the column */
-    title: string 
-    /** Filter status for this column */
+    title: string
     status: TokenStatus
-    /** Total number of tokens in this group */
     count: number
-    /** List of token data to display */
-    tokens: any[] // Should strictly be TokenData[]
-    /** Loading state */
+    tokens: TokenData[]
     loading: boolean
+    className?: string
 }
-
-/**
- * PulseColumn Component
- * Renders a vertical list of TokenCards for a specific category.
- * Handles loading states and layout animations.
- */
-const PulseColumn = ({ title, status, count, tokens, loading }: PulseColumnProps) => {
+const PulseColumn = ({ title, status, count, tokens, loading, className }: PulseColumnProps & { className?: string }) => {
     return (
-        <div className="flex flex-col h-[500px] lg:h-full bg-card/20 border-r-0 lg:border-r border-border/30 last:border-r-0 w-full lg:w-1/3">
+        <div className={cn("flex flex-col h-[500px] lg:h-full bg-card/20 border-r-0 lg:border-r border-border/30 last:border-r-0 w-full lg:w-1/3 transition-all", className)}>
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-border/30 bg-muted/5 sticky top-0 z-10 backdrop-blur-md">
                 <div className="flex items-center gap-2">
@@ -42,9 +33,9 @@ const PulseColumn = ({ title, status, count, tokens, loading }: PulseColumnProps
                         <button className="px-1.5 py-0.5 text-[9px] hover:text-foreground text-muted-foreground transition-colors" aria-label="2 minute timeframe">P2</button>
                         <button className="px-1.5 py-0.5 text-[9px] hover:text-foreground text-muted-foreground transition-colors" aria-label="3 minute timeframe">P3</button>
                      </div>
-                     <button aria-label="Filter options">
-                        <Filter className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-pointer" />
-                     </button>
+                     <div aria-label="Filter options">
+                        <FilterModal /> 
+                     </div>
                 </div>
             </div>
 
@@ -86,14 +77,10 @@ const PulseColumn = ({ title, status, count, tokens, loading }: PulseColumnProps
     )
 }
 
-/**
- * PulseDashboard Component
- * The main container for the token discovery interface.
- * Orchestrates data fetching, live updates, and the 3-column layout.
- */
 export default function PulseDashboard() {
   const { tokens } = useAppSelector(state => state.market)
   const [loading, setLoading] = React.useState(true)
+  const [activeMobileTab, setActiveMobileTab] = React.useState<TokenStatus>('new_pairs')
 
   React.useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000)
@@ -114,11 +101,17 @@ export default function PulseDashboard() {
   const finalStretch = useMemo(() => tokens.filter(t => t.status === 'final_stretch'), [tokens])
   const migrated = useMemo(() => tokens.filter(t => t.status === 'migrated'), [tokens])
 
+  const mobileTabs = [
+      { id: 'new_pairs', label: 'New Pairs' },
+      { id: 'final_stretch', label: 'Final Stretch' },
+      { id: 'migrated', label: 'Migrated' },
+  ]
+
   return (
     <div className="flex flex-col h-full lg:h-[calc(100vh-80px)] w-full"> 
        {/* Dashboard Header */}
-       <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-background/80 backdrop-blur-xl shrink-0">
-           <div className="flex items-center gap-4">
+       <div className="flex flex-col md:flex-row items-center justify-between px-4 lg:px-6 py-4 border-b border-border/40 bg-background/80 backdrop-blur-xl shrink-0 gap-4">
+           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
                <div className="flex items-center gap-2">
                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Pulse</h1>
                    <div className="flex gap-1" role="status" aria-label="Live updates active">
@@ -126,6 +119,24 @@ export default function PulseDashboard() {
                       <div className="h-2 w-2 rounded-full bg-purple-500 animate-pulse delay-75" />
                    </div>
                </div>
+               {/* Mobile Tabs */}
+                <div className="flex lg:hidden bg-muted/20 rounded-lg p-1 border border-border/20">
+                    {mobileTabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveMobileTab(tab.id as TokenStatus)}
+                            className={cn(
+                                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                                activeMobileTab === tab.id 
+                                ? "bg-background text-foreground shadow-sm" 
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
                {/* Global Stats mock */}
                <div className="hidden md:flex gap-4 text-xs font-mono text-muted-foreground border-l border-border/30 pl-4" role="complementary" aria-label="Global market stats">
                    <span>SOL: <span className="text-green-400">$122.6</span></span>
@@ -133,18 +144,12 @@ export default function PulseDashboard() {
                </div>
            </div>
 
-           <div className="flex items-center gap-3">
+           <div className="flex items-center gap-3 w-full md:w-auto justify-end">
                <button 
                   className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-muted/20 border border-border/30 rounded-full hover:bg-muted/40 transition-colors"
                   aria-label="Display settings"
                 >
                    <Settings2 className="w-3.5 h-3.5" /> Display
-               </button>
-                <button 
-                  className="p-2 hover:bg-muted/20 rounded-full transition-colors"
-                  aria-label="Reset view"
-                >
-                   <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
                </button>
            </div>
        </div>
@@ -161,6 +166,7 @@ export default function PulseDashboard() {
               count={newPairs.length} 
               tokens={newPairs} 
               loading={loading}
+              className={cn(activeMobileTab === 'new_pairs' ? 'flex' : 'hidden lg:flex')}
             />
            <PulseColumn 
               title="Final Stretch" 
@@ -168,6 +174,7 @@ export default function PulseDashboard() {
               count={finalStretch.length} 
               tokens={finalStretch} 
               loading={loading}
+              className={cn(activeMobileTab === 'final_stretch' ? 'flex' : 'hidden lg:flex')}
             />
            <PulseColumn 
               title="Migrated" 
@@ -175,6 +182,7 @@ export default function PulseDashboard() {
               count={migrated.length} 
               tokens={migrated} 
               loading={loading}
+              className={cn(activeMobileTab === 'migrated' ? 'flex' : 'hidden lg:flex')}
             />
        </div>
     </div>

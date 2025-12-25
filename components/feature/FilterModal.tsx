@@ -1,0 +1,163 @@
+"use client"
+
+import * as React from "react"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog"
+import { Filter, RefreshCw, X, Search, Check } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+// Filter Constants
+const TABS = ["New Pairs", "Final Stretch", "Migrated"]
+const SUB_TABS = ["Protocols", "Audit", "$ Metrics", "Socials"]
+const PROTOCOLS = [
+  { name: "Pump", color: "text-green-400 bg-green-400/10 border-green-400/20" },
+  { name: "Mayhem", color: "text-red-400 bg-red-400/10 border-red-400/20" },
+  { name: "Bonk", color: "text-orange-400 bg-orange-400/10 border-orange-400/20" },
+  { name: "Bags", color: "text-green-500 bg-green-500/10 border-green-500/20" },
+  { name: "Moonshot", color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
+  { name: "Heaven", color: "text-white bg-white/10 border-white/20" },
+  { name: "Daos.fun", color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
+  { name: "Candle", color: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
+  { name: "Sugar", color: "text-pink-400 bg-pink-400/10 border-pink-400/20" },
+  { name: "Believe", color: "text-green-600 bg-green-600/10 border-green-600/20" },
+  { name: "Jupiter Studio", color: "text-orange-300 bg-orange-300/10 border-orange-300/20" },
+  { name: "Moonit", color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
+]
+
+export function FilterModal() {
+  const [activeTab, setActiveTab] = React.useState("Final Stretch")
+  const [activeSubTab, setActiveSubTab] = React.useState("Protocols")
+  const [selectedProtocols, setSelectedProtocols] = React.useState<string[]>(["Pump", "Believe"])
+
+  const toggleProtocol = (name: string) => {
+    setSelectedProtocols(prev => 
+      prev.includes(name) ? prev.filter(p => p !== name) : [...prev, name]
+    )
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button className="hover:text-foreground transition-colors" aria-label="Open filters">
+           <Filter className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-pointer" />
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[600px] bg-[#09090b] border-border/40 text-foreground p-0 gap-0 overflow-hidden shadow-2xl">
+        {/* Header Section */}
+        <div className="p-6 pb-4 space-y-4 border-b border-border/20">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl font-bold">Filters</DialogTitle>
+             {/* Close is built-in but we can custom style or add reset here if needed */}
+          </div>
+
+          {/* Main Tabs */}
+          <div className="flex items-center gap-6 text-sm font-medium text-muted-foreground border-b border-border/20 pb-0">
+             {TABS.map(tab => (
+               <button
+                 key={tab}
+                 onClick={() => setActiveTab(tab)}
+                 className={cn(
+                   "pb-3 relative transition-colors hover:text-foreground",
+                   activeTab === tab ? "text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-primary" : ""
+                 )}
+               >
+                 {tab}
+               </button>
+             ))}
+             <RefreshCw className="w-3.5 h-3.5 ml-auto mb-3 cursor-pointer hover:rotate-180 transition-transform" />
+          </div>
+
+          {/* Search Inputs */}
+          <div className="grid grid-cols-2 gap-4 pt-2">
+             <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground font-medium">Search Keywords</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    placeholder="keyword1, keyword2..." 
+                    className="w-full bg-muted/20 border border-border/20 roundedmd px-3 py-2 text-xs focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 rounded-md"
+                  />
+                </div>
+             </div>
+             <div className="space-y-1.5">
+                <label className="text-xs text-muted-foreground font-medium">Exclude Keywords</label>
+                <input 
+                  type="text" 
+                  placeholder="keyword1, keyword2..." 
+                  className="w-full bg-muted/20 border border-border/20 roundedmd px-3 py-2 text-xs focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 rounded-md"
+                />
+             </div>
+          </div>
+        </div>
+
+        {/* content */}
+        <div className="p-6 pt-2 h-[320px] overflow-y-auto custom-scrollbar">
+           {/* Sub Tabs */}
+           <div className="flex items-center gap-2 mb-6">
+              {SUB_TABS.map(tab => (
+                 <button
+                    key={tab}
+                    onClick={() => setActiveSubTab(tab)}
+                    className={cn(
+                      "px-4 py-1.5 rounded-full text-xs font-medium transition-colors border",
+                      activeSubTab === tab 
+                        ? "bg-muted/30 border-border/40 text-foreground" 
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/10"
+                    )}
+                 >
+                    {tab}
+                 </button>
+              ))}
+              <button 
+                 onClick={() => setSelectedProtocols([])}
+                 className="ml-auto text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                 Unselect All
+              </button>
+           </div>
+           
+           {/* Protocols Grid */}
+           {activeSubTab === 'Protocols' && (
+              <div className="grid grid-cols-3 gap-3">
+                 {PROTOCOLS.map((proto) => {
+                    const isSelected = selectedProtocols.includes(proto.name)
+                    return (
+                       <button
+                          key={proto.name}
+                          onClick={() => toggleProtocol(proto.name)}
+                          className={cn(
+                             "flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all",
+                             isSelected ? "bg-muted/20 border-primary/30" : "bg-transparent border-border/20 opacity-60 hover:opacity-100",
+                             proto.color
+                          )}
+                       >
+                          {/* Mock Icons based on name or generic */}
+                          <div className={cn("w-2 h-2 rounded-full", isSelected ? "bg-current" : "bg-muted-foreground")} />
+                          {proto.name}
+                       </button>
+                    )
+                 })}
+              </div>
+           )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-border/20 flex items-center justify-between bg-muted/5">
+             <div className="flex gap-2">
+                <button className="px-4 py-1.5 rounded-full bg-muted/30 hover:bg-muted/50 text-xs font-medium text-muted-foreground transition-colors">Import</button>
+                <button className="px-4 py-1.5 rounded-full bg-muted/30 hover:bg-muted/50 text-xs font-medium text-muted-foreground transition-colors">Export</button>
+                <button className="px-4 py-1.5 rounded-full bg-muted/30 hover:bg-muted/50 text-xs font-medium text-muted-foreground transition-colors">Share</button>
+             </div>
+             <button className="px-6 py-1.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-lg shadow-blue-500/20">
+                Apply All
+             </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
