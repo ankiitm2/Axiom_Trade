@@ -8,17 +8,18 @@ import { FilterModal } from './FilterModal'
 import { cn } from '@/lib/utils'
 import TokenCard from './TokenCard'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
-import { TokenData, TokenStatus, updatePrices } from '@/lib/features/market/marketSlice'
+import { TokenData, TokenStatus, updatePrices, selectFilteredTokens } from '@/lib/features/market/marketSlice'
 
 interface PulseColumnProps {
     title: string
     status: TokenStatus
     count: number
+    totalCount: number
     tokens: TokenData[]
     loading: boolean
     className?: string
 }
-const PulseColumn = ({ title, status, count, tokens, loading, className }: PulseColumnProps & { className?: string }) => {
+const PulseColumn = ({ title, status, count, totalCount, tokens, loading, className }: PulseColumnProps & { className?: string }) => {
     return (
         <div className={cn("flex flex-col h-[500px] lg:h-full bg-card/20 border-r-0 lg:border-r border-border/30 last:border-r-0 w-full lg:w-1/3 transition-all", className)}>
             {/* Header */}
@@ -27,14 +28,16 @@ const PulseColumn = ({ title, status, count, tokens, loading, className }: Pulse
                     <h2 className="text-base font-bold text-foreground">{title}</h2>
                 </div>
                 <div className="flex items-center gap-2">
-                     <span className="text-xs font-mono text-muted-foreground mr-1">{count}</span>
+                     <span className="text-xs font-mono text-muted-foreground mr-1">
+                       ⚡ {count}{totalCount !== count && <span className="text-muted-foreground/50"> / {totalCount}</span>}
+                     </span>
                      <div className="flex bg-muted/20 rounded p-0.5 border border-border/20" role="group" aria-label="Timeframe filters">
                         <button className="px-1.5 py-0.5 text-[9px] hover:text-foreground text-muted-foreground transition-colors" aria-label="1 minute timeframe">P1</button>
                         <button className="px-1.5 py-0.5 text-[9px] hover:text-foreground text-muted-foreground transition-colors" aria-label="2 minute timeframe">P2</button>
                         <button className="px-1.5 py-0.5 text-[9px] hover:text-foreground text-muted-foreground transition-colors" aria-label="3 minute timeframe">P3</button>
                      </div>
                      <div aria-label="Filter options">
-                        <FilterModal /> 
+                        <FilterModal section={status} /> 
                      </div>
                 </div>
             </div>
@@ -78,7 +81,8 @@ const PulseColumn = ({ title, status, count, tokens, loading, className }: Pulse
 }
 
 export default function PulseDashboard() {
-  const { tokens } = useAppSelector(state => state.market)
+  const tokens = useAppSelector(selectFilteredTokens)
+  const allTokens = useAppSelector(state => state.market.tokens)
   const [loading, setLoading] = React.useState(true)
   const [activeMobileTab, setActiveMobileTab] = React.useState<TokenStatus>('new_pairs')
 
@@ -96,10 +100,15 @@ export default function PulseDashboard() {
     return () => clearInterval(interval)
   }, [dispatch])
 
-  // Derived state for columns
+  // Derived state for columns (filtered)
   const newPairs = useMemo(() => tokens.filter(t => t.status === 'new_pairs'), [tokens])
   const finalStretch = useMemo(() => tokens.filter(t => t.status === 'final_stretch'), [tokens])
   const migrated = useMemo(() => tokens.filter(t => t.status === 'migrated'), [tokens])
+
+  // Total counts (unfiltered)
+  const totalNewPairs = useMemo(() => allTokens.filter(t => t.status === 'new_pairs').length, [allTokens])
+  const totalFinalStretch = useMemo(() => allTokens.filter(t => t.status === 'final_stretch').length, [allTokens])
+  const totalMigrated = useMemo(() => allTokens.filter(t => t.status === 'migrated').length, [allTokens])
 
   const mobileTabs = [
       { id: 'new_pairs', label: 'New Pairs' },
@@ -163,7 +172,8 @@ export default function PulseDashboard() {
            <PulseColumn 
               title="New Pairs" 
               status="new_pairs" 
-              count={newPairs.length} 
+              count={newPairs.length}
+              totalCount={totalNewPairs}
               tokens={newPairs} 
               loading={loading}
               className={cn(activeMobileTab === 'new_pairs' ? 'flex' : 'hidden lg:flex')}
@@ -171,7 +181,8 @@ export default function PulseDashboard() {
            <PulseColumn 
               title="Final Stretch" 
               status="final_stretch" 
-              count={finalStretch.length} 
+              count={finalStretch.length}
+              totalCount={totalFinalStretch}
               tokens={finalStretch} 
               loading={loading}
               className={cn(activeMobileTab === 'final_stretch' ? 'flex' : 'hidden lg:flex')}
@@ -179,7 +190,8 @@ export default function PulseDashboard() {
            <PulseColumn 
               title="Migrated" 
               status="migrated" 
-              count={migrated.length} 
+              count={migrated.length}
+              totalCount={totalMigrated}
               tokens={migrated} 
               loading={loading}
               className={cn(activeMobileTab === 'migrated' ? 'flex' : 'hidden lg:flex')}

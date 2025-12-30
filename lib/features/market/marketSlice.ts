@@ -1,4 +1,5 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { createSlice, PayloadAction, createSelector } from '@reduxjs/toolkit'
+import type { RootState } from '../../store'
 
 /**
  * Defines the possible statuses a token can have, used for filtering.
@@ -7,6 +8,11 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
  * - 'migrated': Tokens that have completed their initial phase or moved to a new chain.
  */
 export type TokenStatus = 'new_pairs' | 'final_stretch' | 'migrated'
+
+export const PROTOCOL_NAMES = [
+  "Pump", "Mayhem", "Bonk", "Bags", "Moonshot", "Heaven", 
+  "Daos.fun", "Candle", "Sugar", "Believe", "Jupiter Studio", "Moonit"
+]
 
 /**
  * Represents the full data structure for a single token in the marketplace.
@@ -30,6 +36,7 @@ export interface TokenData {
   holders: number
   timeSinceCreation: string
   contractAddress: string
+  protocol: string
   /** Security metrics often checked by traders */
   security: {
     noMint: boolean
@@ -47,6 +54,18 @@ export interface TokenData {
  */
 export type SortOption = 'trending' | 'marketCap' | 'creationTime'
 
+export interface FilterOptions {
+    keywords: string[]
+    excludedKeywords: string[]
+    protocols: string[]
+}
+
+export interface SectionFilters {
+  new_pairs: FilterOptions
+  final_stretch: FilterOptions
+  migrated: FilterOptions
+}
+
 /**
  * Represents the state structure for the market slice.
  * Manages a list of tokens, current filter, sort order, and selected token.
@@ -54,6 +73,7 @@ export type SortOption = 'trending' | 'marketCap' | 'creationTime'
 interface MarketState {
   tokens: TokenData[]
   filter: TokenStatus | 'all'
+  activeFilters: SectionFilters
   sort: SortOption
   selectedToken: TokenData | null
 }
@@ -115,6 +135,8 @@ const generateMockTokens = (): TokenData[] => {
         const randIndex = Math.floor(seededRandom(i * 100 + j) * chars.length)
         address += chars.charAt(randIndex)
     }
+    
+    const protocol = PROTOCOL_NAMES[Math.floor(seededRandom(i * 15) * PROTOCOL_NAMES.length)]
 
     tokens.push({
       id: `token-${i}`,
@@ -139,6 +161,7 @@ const generateMockTokens = (): TokenData[] => {
         top10Holders: seededRandom(i * 14) * 50
       },
       status, 
+      protocol,
       history: Array.from({ length: 20 }, (_, hIdx) => seededRandom(i * 20 + hIdx) * 100)
     })
   }
@@ -148,6 +171,23 @@ const generateMockTokens = (): TokenData[] => {
 const initialState: MarketState = {
   tokens: generateMockTokens(),
   filter: 'all',
+  activeFilters: {
+    new_pairs: {
+      keywords: [],
+      excludedKeywords: [],
+      protocols: []
+    },
+    final_stretch: {
+      keywords: [],
+      excludedKeywords: [],
+      protocols: []
+    },
+    migrated: {
+      keywords: [],
+      excludedKeywords: [],
+      protocols: []
+    }
+  },
   sort: 'trending',
   selectedToken: null
 }
@@ -161,6 +201,9 @@ export const marketSlice = createSlice({
     },
     setSort: (state, action: PayloadAction<SortOption>) => {
       state.sort = action.payload
+    },
+    setFilters: (state, action: PayloadAction<{ section: TokenStatus; filters: FilterOptions }>) => {
+        state.activeFilters[action.payload.section] = action.payload.filters
     },
     /**
      * Simulates real-time market activity.
@@ -200,6 +243,42 @@ export const marketSlice = createSlice({
   },
 })
 
-export const { setFilter, setSort, updatePrices } = marketSlice.actions
+export const { setFilter, setSort, updatePrices, setFilters } = marketSlice.actions
+
+// Custom selector to apply filters per section
+export const selectFilteredTokens = createSelector(
+  [(state: RootState) => state.market.tokens, (state: RootState) => state.market.activeFilters],
+  (tokens, sectionFilters) => {
+    return tokens.filter(token => {
+       // Get filters for this token's section
+       const filters = sectionFilters[token.status]
+       
+       // Filter by Protocol
+       if (filters.protocols.length > 0 && !filters.protocols.includes(token.protocol)) {
+           return false
+       }
+       
+       // Filter by Keywords (Name, Symbol)
+       if (filters.keywords.length > 0) {
+           const match = filters.keywords.some((k: string) => 
+               token.name.toLowerCase().includes(k.toLowerCase()) || 
+               token.symbol.toLowerCase().includes(k.toLowerCase())
+           )
+           if (!match) return false
+       }
+
+       // Filter by Excluded Keywords (Name, Symbol)
+       if (filters.excludedKeywords.length > 0) {
+           const match = filters.excludedKeywords.some((k: string) => 
+               token.name.toLowerCase().includes(k.toLowerCase()) || 
+               token.symbol.toLowerCase().includes(k.toLowerCase())
+           )
+           if (match) return false
+       }
+
+       return true
+    })
+  }
+)
 
 export default marketSlice.reducer

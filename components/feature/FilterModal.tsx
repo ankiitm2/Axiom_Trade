@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/dialog"
 import { Filter, RefreshCw, X, Search, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useAppDispatch, useAppSelector } from "@/lib/hooks"
+import { setFilters, TokenStatus } from "@/lib/features/market/marketSlice"
 
 // Filter Constants
 const TABS = ["New Pairs", "Final Stretch", "Migrated"]
@@ -29,10 +31,32 @@ const PROTOCOLS = [
   { name: "Moonit", color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
 ]
 
-export function FilterModal() {
+interface FilterModalProps {
+  section: TokenStatus
+}
+
+export function FilterModal({ section }: FilterModalProps) {
+  const dispatch = useAppDispatch()
+  const { activeFilters } = useAppSelector(state => state.market)
+  
   const [activeTab, setActiveTab] = React.useState("Final Stretch")
   const [activeSubTab, setActiveSubTab] = React.useState("Protocols")
-  const [selectedProtocols, setSelectedProtocols] = React.useState<string[]>(["Pump", "Believe"])
+  
+  // Local state
+  const [selectedProtocols, setSelectedProtocols] = React.useState<string[]>([])
+  const [searchKeywords, setSearchKeywords] = React.useState("")
+  const [excludeKeywords, setExcludeKeywords] = React.useState("")
+  const [open, setOpen] = React.useState(false)
+
+  // Sync with Redux when opening - use section-specific filters
+  React.useEffect(() => {
+     if (open) {
+         const sectionFilters = activeFilters[section]
+         setSelectedProtocols(sectionFilters.protocols)
+         setSearchKeywords(sectionFilters.keywords.join(', '))
+         setExcludeKeywords(sectionFilters.excludedKeywords.join(', '))
+     }
+  }, [open, activeFilters, section])
 
   const toggleProtocol = (name: string) => {
     setSelectedProtocols(prev => 
@@ -40,8 +64,23 @@ export function FilterModal() {
     )
   }
 
+  const handleApply = () => {
+      const keywords = searchKeywords.split(',').map(s => s.trim()).filter(Boolean)
+      const excluded = excludeKeywords.split(',').map(s => s.trim()).filter(Boolean)
+
+      dispatch(setFilters({
+          section,
+          filters: {
+            keywords,
+            excludedKeywords: excluded,
+            protocols: selectedProtocols
+          }
+      }))
+      setOpen(false)
+  }
+
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <button className="hover:text-foreground transition-colors" aria-label="Open filters">
            <Filter className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-pointer" />
@@ -57,18 +96,48 @@ export function FilterModal() {
 
           {/* Main Tabs */}
           <div className="flex items-center gap-6 text-sm font-medium text-muted-foreground border-b border-border/20 pb-0">
-             {TABS.map(tab => (
-               <button
-                 key={tab}
-                 onClick={() => setActiveTab(tab)}
-                 className={cn(
-                   "pb-3 relative transition-colors hover:text-foreground",
-                   activeTab === tab ? "text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-primary" : ""
-                 )}
-               >
-                 {tab}
-               </button>
-             ))}
+             {TABS.map((tab, index) => {
+               // Map tab name to section
+               const tabSectionMap: Record<string, TokenStatus> = {
+                 "New Pairs": "new_pairs",
+                 "Final Stretch": "final_stretch",
+                 "Migrated": "migrated"
+               }
+               const tabSection = tabSectionMap[tab]
+               
+               // Calculate filter count for this specific section
+               let filterCount = 0
+               if (tabSection === section) {
+                 // For current section, use local state
+                 filterCount = selectedProtocols.length + 
+                   (searchKeywords.trim() ? searchKeywords.split(',').filter(Boolean).length : 0) +
+                   (excludeKeywords.trim() ? excludeKeywords.split(',').filter(Boolean).length : 0)
+               } else {
+                 // For other sections, use saved filters from Redux
+                 const sectionFilters = activeFilters[tabSection]
+                 filterCount = sectionFilters.protocols.length + 
+                   sectionFilters.keywords.length + 
+                   sectionFilters.excludedKeywords.length
+               }
+               
+               return (
+                 <button
+                   key={tab}
+                   onClick={() => setActiveTab(tab)}
+                   className={cn(
+                     "pb-3 relative transition-colors hover:text-foreground flex items-center gap-2",
+                     activeTab === tab ? "text-foreground after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-primary" : ""
+                   )}
+                 >
+                   {tab}
+                   {filterCount > 0 && (
+                     <span className="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-blue-500 text-white text-[10px] font-bold">
+                       {filterCount}
+                     </span>
+                   )}
+                 </button>
+               )
+             })}
              <RefreshCw className="w-3.5 h-3.5 ml-auto mb-3 cursor-pointer hover:rotate-180 transition-transform" />
           </div>
 
@@ -80,6 +149,8 @@ export function FilterModal() {
                   <input 
                     type="text" 
                     placeholder="keyword1, keyword2..." 
+                    value={searchKeywords}
+                    onChange={(e) => setSearchKeywords(e.target.value)}
                     className="w-full bg-muted/20 border border-border/20 roundedmd px-3 py-2 text-xs focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 rounded-md"
                   />
                 </div>
@@ -89,6 +160,8 @@ export function FilterModal() {
                 <input 
                   type="text" 
                   placeholder="keyword1, keyword2..." 
+                  value={excludeKeywords}
+                  onChange={(e) => setExcludeKeywords(e.target.value)}
                   className="w-full bg-muted/20 border border-border/20 roundedmd px-3 py-2 text-xs focus:outline-none focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 rounded-md"
                 />
              </div>
@@ -114,10 +187,16 @@ export function FilterModal() {
                  </button>
               ))}
               <button 
-                 onClick={() => setSelectedProtocols([])}
+                 onClick={() => {
+                   if (selectedProtocols.length === PROTOCOLS.length) {
+                     setSelectedProtocols([])
+                   } else {
+                     setSelectedProtocols(PROTOCOLS.map(p => p.name))
+                   }
+                 }}
                  className="ml-auto text-[10px] text-muted-foreground hover:text-foreground transition-colors"
               >
-                 Unselect All
+                 {selectedProtocols.length === PROTOCOLS.length ? 'Unselect All' : 'Select All'}
               </button>
            </div>
            
@@ -153,7 +232,10 @@ export function FilterModal() {
                 <button className="px-4 py-1.5 rounded-full bg-muted/30 hover:bg-muted/50 text-xs font-medium text-muted-foreground transition-colors">Export</button>
                 <button className="px-4 py-1.5 rounded-full bg-muted/30 hover:bg-muted/50 text-xs font-medium text-muted-foreground transition-colors">Share</button>
              </div>
-             <button className="px-6 py-1.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-lg shadow-blue-500/20">
+             <button 
+                onClick={handleApply}
+                className="px-6 py-1.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-colors shadow-lg shadow-blue-500/20"
+             >
                 Apply All
              </button>
         </div>
