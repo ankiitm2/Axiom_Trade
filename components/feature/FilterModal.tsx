@@ -8,38 +8,34 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog"
-import { Filter, RefreshCw, X, Search, Check } from "lucide-react"
+import { Filter, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAppDispatch, useAppSelector } from "@/lib/hooks"
 import { setFilters, TokenStatus } from "@/lib/features/market/marketSlice"
-
-// Filter Constants
-const TABS = ["New Pairs", "Final Stretch", "Migrated"]
-const SUB_TABS = ["Protocols", "Audit", "$ Metrics", "Socials"]
-const PROTOCOLS = [
-  { name: "Pump", color: "text-green-400 bg-green-400/10 border-green-400/20" },
-  { name: "Mayhem", color: "text-red-400 bg-red-400/10 border-red-400/20" },
-  { name: "Bonk", color: "text-orange-400 bg-orange-400/10 border-orange-400/20" },
-  { name: "Bags", color: "text-green-500 bg-green-500/10 border-green-500/20" },
-  { name: "Moonshot", color: "text-purple-400 bg-purple-400/10 border-purple-400/20" },
-  { name: "Heaven", color: "text-white bg-white/10 border-white/20" },
-  { name: "Daos.fun", color: "text-blue-400 bg-blue-400/10 border-blue-400/20" },
-  { name: "Candle", color: "text-orange-500 bg-orange-500/10 border-orange-500/20" },
-  { name: "Sugar", color: "text-pink-400 bg-pink-400/10 border-pink-400/20" },
-  { name: "Believe", color: "text-green-600 bg-green-600/10 border-green-600/20" },
-  { name: "Jupiter Studio", color: "text-orange-300 bg-orange-300/10 border-orange-300/20" },
-  { name: "Moonit", color: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20" },
-]
+import { PROTOCOLS, FILTER_TABS, FILTER_SUB_TABS, TAB_TO_STATUS_MAP, STATUS_TO_DISPLAY_MAP } from "@/lib/constants"
 
 interface FilterModalProps {
   section: TokenStatus
 }
 
+/**
+ * FilterModal Component
+ * Provides filtering interface for token lists with section-specific filters
+ * 
+ * Features:
+ * - Protocol filtering with visual indicators
+ * - Keyword search and exclusion
+ * - Section-specific filter state
+ * - Real-time filter count badges
+ * 
+ * @param section - The token status section this modal is filtering for
+ */
 export function FilterModal({ section }: FilterModalProps) {
   const dispatch = useAppDispatch()
   const { activeFilters } = useAppSelector(state => state.market)
   
-  const [activeTab, setActiveTab] = React.useState("Final Stretch")
+  // Set initial tab based on the section prop
+  const [activeTab, setActiveTab] = React.useState(() => STATUS_TO_DISPLAY_MAP[section])
   const [activeSubTab, setActiveSubTab] = React.useState("Protocols")
   
   // Local state
@@ -51,6 +47,9 @@ export function FilterModal({ section }: FilterModalProps) {
   // Sync with Redux when opening - use section-specific filters
   React.useEffect(() => {
      if (open) {
+         // Set the active tab to match the section when modal opens
+         setActiveTab(STATUS_TO_DISPLAY_MAP[section])
+         
          const sectionFilters = activeFilters[section]
          setSelectedProtocols(sectionFilters.protocols)
          setSearchKeywords(sectionFilters.keywords.join(', '))
@@ -96,14 +95,9 @@ export function FilterModal({ section }: FilterModalProps) {
 
           {/* Main Tabs */}
           <div className="flex items-center gap-6 text-sm font-medium text-muted-foreground border-b border-border/20 pb-0">
-             {TABS.map((tab, index) => {
+             {FILTER_TABS.map((tab) => {
                // Map tab name to section
-               const tabSectionMap: Record<string, TokenStatus> = {
-                 "New Pairs": "new_pairs",
-                 "Final Stretch": "final_stretch",
-                 "Migrated": "migrated"
-               }
-               const tabSection = tabSectionMap[tab]
+               const tabSection = TAB_TO_STATUS_MAP[tab]
                
                // Calculate filter count for this specific section
                let filterCount = 0
@@ -172,7 +166,7 @@ export function FilterModal({ section }: FilterModalProps) {
         <div className="p-6 pt-2 h-[320px] overflow-y-auto custom-scrollbar">
            {/* Sub Tabs */}
            <div className="flex items-center gap-2 mb-6">
-              {SUB_TABS.map(tab => (
+              {FILTER_SUB_TABS.map((tab) => (
                  <button
                     key={tab}
                     onClick={() => setActiveSubTab(tab)}

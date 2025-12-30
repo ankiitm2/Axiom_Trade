@@ -7,8 +7,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { FilterModal } from './FilterModal'
 import { cn } from '@/lib/utils'
 import TokenCard from './TokenCard'
-import { useAppDispatch, useAppSelector } from '@/lib/hooks'
-import { TokenData, TokenStatus, updatePrices, selectFilteredTokens } from '@/lib/features/market/marketSlice'
+import { useAppDispatch } from '@/lib/hooks'
+import { TokenData, TokenStatus, updatePrices } from '@/lib/features/market/marketSlice'
+import { useFilteredTokens } from '@/lib/hooks/useFilteredTokens'
+import { useTokenCount } from '@/lib/hooks/useTokenCount'
 
 interface PulseColumnProps {
     title: string
@@ -19,7 +21,21 @@ interface PulseColumnProps {
     loading: boolean
     className?: string
 }
-const PulseColumn = ({ title, status, count, totalCount, tokens, loading, className }: PulseColumnProps & { className?: string }) => {
+
+/**
+ * PulseColumn component - Displays a column of tokens with filters
+ * Memoized to prevent unnecessary re-renders when parent updates
+ * Only re-renders when count, totalCount, loading, or tokens length changes
+ */
+const PulseColumn = React.memo(({ 
+    title, 
+    status, 
+    count, 
+    totalCount, 
+    tokens, 
+    loading, 
+    className 
+}: PulseColumnProps) => {
     return (
         <div className={cn("flex flex-col h-[500px] lg:h-full bg-card/20 border-r-0 lg:border-r border-border/30 last:border-r-0 w-full lg:w-1/3 transition-all", className)}>
             {/* Header */}
@@ -58,6 +74,29 @@ const PulseColumn = ({ title, status, count, totalCount, tokens, loading, classN
                             </div>
                         </div>
                     ))
+                ) : tokens.length === 0 ? (
+                    // Empty state when no tokens match filters
+                    <div className="flex flex-col items-center justify-center h-full py-12 px-4 text-center">
+                        <div className="w-16 h-16 rounded-full bg-muted/20 flex items-center justify-center mb-4">
+                            <svg 
+                                className="w-8 h-8 text-muted-foreground" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                            >
+                                <path 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round" 
+                                    strokeWidth={2} 
+                                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" 
+                                />
+                            </svg>
+                        </div>
+                        <h3 className="text-sm font-medium text-foreground mb-1">No tokens found</h3>
+                        <p className="text-xs text-muted-foreground max-w-[200px]">
+                            No tokens match your current filters. Try adjusting your filter criteria.
+                        </p>
+                    </div>
                 ) : (
                     tokens.map((token) => (
                         <motion.div
@@ -78,13 +117,33 @@ const PulseColumn = ({ title, status, count, totalCount, tokens, loading, classN
             </div>
         </div>
     )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for optimization
+  // Allow re-render if count changes, loading changes, or if we have different number of tokens
+  // Don't block re-renders for price updates - we want those to show!
+  return (
+    prevProps.count === nextProps.count &&
+    prevProps.totalCount === nextProps.totalCount &&
+    prevProps.loading === nextProps.loading &&
+    prevProps.tokens === nextProps.tokens // Reference equality check - will update when Redux state changes
+  )
+})
+
+PulseColumn.displayName = 'PulseColumn'
 
 export default function PulseDashboard() {
-  const tokens = useAppSelector(selectFilteredTokens)
-  const allTokens = useAppSelector(state => state.market.tokens)
   const [loading, setLoading] = React.useState(true)
   const [activeMobileTab, setActiveMobileTab] = React.useState<TokenStatus>('new_pairs')
+
+  // Use custom hooks for filtered tokens per section
+  const newPairs = useFilteredTokens('new_pairs')
+  const finalStretch = useFilteredTokens('final_stretch')
+  const migrated = useFilteredTokens('migrated')
+
+  // Use custom hooks for total counts
+  const totalNewPairs = useTokenCount('new_pairs')
+  const totalFinalStretch = useTokenCount('final_stretch')
+  const totalMigrated = useTokenCount('migrated')
 
   React.useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000)
@@ -99,16 +158,6 @@ export default function PulseDashboard() {
     }, 800) 
     return () => clearInterval(interval)
   }, [dispatch])
-
-  // Derived state for columns (filtered)
-  const newPairs = useMemo(() => tokens.filter(t => t.status === 'new_pairs'), [tokens])
-  const finalStretch = useMemo(() => tokens.filter(t => t.status === 'final_stretch'), [tokens])
-  const migrated = useMemo(() => tokens.filter(t => t.status === 'migrated'), [tokens])
-
-  // Total counts (unfiltered)
-  const totalNewPairs = useMemo(() => allTokens.filter(t => t.status === 'new_pairs').length, [allTokens])
-  const totalFinalStretch = useMemo(() => allTokens.filter(t => t.status === 'final_stretch').length, [allTokens])
-  const totalMigrated = useMemo(() => allTokens.filter(t => t.status === 'migrated').length, [allTokens])
 
   const mobileTabs = [
       { id: 'new_pairs', label: 'New Pairs' },
